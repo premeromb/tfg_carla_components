@@ -63,9 +63,11 @@ class SpecificWorker(GenericWorker):
 
         self.Period = 0
 
-        self.initLat = None
-        self.initLong = None
+        self.previousLat = None
+        self.previousLong = None
 
+        self.currentLat = None
+        self.currentLong = None
 
         if startup_check:
             self.startup_check()
@@ -89,10 +91,9 @@ class SpecificWorker(GenericWorker):
 
     @QtCore.Slot()
     def compute(self):
-        if not self.initLat and not self.initLong:
-            self.initLat = self.gnss_sensor.latitude
-            self.initLong = self.gnss_sensor.longitude
-            print("\n    INITIAL POS VEHICLE -> LAT: {} , LONG: {}".format(self.initLat, self.initLong))
+        if not self.previousLat and not self.previousLong:
+            self.previousLat = self.gnss_sensor.latitude
+            self.previousLong = self.gnss_sensor.longitude
 
         self.clock.tick_busy_loop(60)
         if self.controller and self.controller.parse_events(self.clock):
@@ -109,13 +110,20 @@ class SpecificWorker(GenericWorker):
 
             self.hud.tick(self, self.clock, control)
 
-        print("\n    CURRENT POS VEHICLE -> LAT: {} , LONG: {}".format(self.gnss_sensor.latitude, self.gnss_sensor.longitude))
+            self.currentLat = self.gnss_sensor.latitude
+            self.currentLong = self.gnss_sensor.longitude
+
+        if self.currentLong != self.previousLong or self.currentLat != self.currentLat:
+            print("\n    CURRENT POS VEHICLE -> LAT: {} , LONG: {}".format(self.currentLat, self.currentLong))
+            self.previousLat = self.currentLat
+            self.previousLong = self.currentLong
 
         self.camera_manager.render(self.display)
         self.hud.render(self.display)
         pygame.display.flip()
 
         return True
+
 
     def startup_check(self):
         QTimer.singleShot(200, QApplication.instance().quit)
@@ -133,7 +141,6 @@ class SpecificWorker(GenericWorker):
     # SUBSCRIPTION to updateSensorGNSS method from CarlaSensors interface
     #
     def CarlaSensors_updateSensorGNSS(self, gnssData):
-        # print(gnssData.latitude, gnssData.longitude)
         self.gnss_sensor.update(gnssData.latitude, gnssData.longitude, gnssData.altitude, gnssData.frame,
                                 gnssData.timestamp)
 
